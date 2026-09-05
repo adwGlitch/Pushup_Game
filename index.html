@@ -636,12 +636,12 @@ const CAM = {
   // Push-up state machine
   phase:'IDLE',       // IDLE | READY | DOWN
   readyFrames:0,
-  READY_NEEDED:20,
+  READY_NEEDED:15,    // faster ready
   lastRepMs:0,
-  MIN_REP_MS:650,
-  // Thresholds
-  upAngle:150,
-  downAngle:95,
+  MIN_REP_MS:500,     // allow faster reps
+  // Thresholds (relaxed for better detection)
+  upAngle:140,
+  downAngle:105,
 };
 
 // ═══════════════════════════════════════════════
@@ -804,18 +804,24 @@ function calcPosture(lm){
   const avgAngle = (lAngle && rAngle) ? (lAngle+rAngle)/2 : (lAngle||rAngle||null);
 
   // ── 1. BODY ALIGNMENT ─────────────────────────
-  // Check hip deviation from shoulder-ankle midline
+  // We relax this significantly so the user doesn't have to fit their whole body in frame.
   const sY = (lm[11].y + lm[12].y) / 2;
   const hY = (lm[23].y + lm[24].y) / 2;
-  const aY = (lm[27].y + lm[28].y) / 2;
-  const bodySpread = Math.max(sY,hY,aY) - Math.min(sY,hY,aY);
-  const isHorizontal = bodySpread < 0.3;
-  let alignment = {status:'idle', text:'GET HORIZONTAL'};
+  let aY = hY; 
+  if(lm[27] && lm[28] && lm[27].visibility > 0.4 && lm[28].visibility > 0.4){
+    aY = (lm[27].y + lm[28].y) / 2;
+  }
+  
+  // Just check if shoulders and hips are somewhat aligned, but don't strictly enforce it.
+  const bodySpread = Math.abs(sY - hY);
+  const isHorizontal = bodySpread < 0.45; // very relaxed
+  
+  let alignment = {status:'idle', text:'ALIGNMENT'};
   if(isHorizontal){
     const idealHipY = (sY + aY) / 2;
     const hipDev = hY - idealHipY;
-    if(Math.abs(hipDev) < 0.05)        alignment = {status:'good', text:'ALIGNED ✓'};
-    else if(hipDev < -0.05)            alignment = {status:'warn', text:'LOWER HIPS'};
+    if(Math.abs(hipDev) < 0.1)         alignment = {status:'good', text:'ALIGNED ✓'};
+    else if(hipDev < -0.1)             alignment = {status:'warn', text:'LOWER HIPS'};
     else                               alignment = {status:'warn', text:'TIGHTEN CORE'};
   }
 
@@ -999,10 +1005,10 @@ function angle3D(a,b,c){
 }
 
 function detectPushUp(lm, posture){
-  const {avgAngle, isHorizontal} = posture;
+  const {avgAngle} = posture;
 
-  if(!isHorizontal || avgAngle === null){
-    setBadge('GET HORIZONTAL','nopose');
+  if(avgAngle === null){
+    setBadge('ARMS NOT VISIBLE','nopose');
     CAM.phase='IDLE'; CAM.readyFrames=0;
     return;
   }
