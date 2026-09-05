@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Rise of the Repborn</title>
+<meta name="description" content="A dark fantasy RPG controlled entirely by real push-ups. Defeat monsters with your body."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Inter:wght@300;400;600;700&display=swap"/>
+
+<!-- MediaPipe Pose CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --gold:#c5a059;--gold-dim:#7a6132;--gold-glow:rgba(197,160,89,0.3);
+  --red:#c0392b;--red-dim:#7a1a1a;--red-bright:#e74c3c;
+  --green:#27ae60;--green-dim:#1a5e38;
+  --blue-rift:#4a0aff;
+  --bg:#07070a;--panel:rgba(15,15,20,0.94);--border:#2a2620;
+  --text:#ccc5b9;--muted:#6e6860;
+  --font-d:'Cinzel',serif;--font-ui:'Inter',sans-serif;
+}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--font-ui);
+  height:100dvh;width:100vw;overflow:hidden;
+  display:flex;justify-content:center;align-items:stretch;
+  background-image:radial-gradient(ellipse at 50% 0%,#12101a 0%,var(--bg) 70%);
+}
+#root{
+  width:100%;max-width:480px;display:flex;flex-direction:column;
+  position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#0c0c14 0%,#07070a 100%);
+  box-shadow:0 0 80px rgba(0,0,0,0.9);
+}
+
+/* ── SCREENS ─────────────────────────────────── */
+.screen{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;transition:opacity 0.4s ease;
+}
+.screen.active{opacity:1;pointer-events:all;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* ── MAIN MENU ───────────────────────────────── */
+#screen-menu{
+  align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 25%,#13101e 0%,#07070a 70%);
+}
+.menu-logo{text-align:center;margin-bottom:48px;}
+.menu-logo .eyebrow{
+  font-family:var(--font-d);font-size:10px;letter-spacing:6px;
+  color:var(--muted);margin-bottom:16px;text-transform:uppercase;
+}
+.menu-logo h1{
+  font-family:var(--font-d);font-size:clamp(30px,8vw,46px);
+  font-weight:800;letter-spacing:3px;
+  color:var(--gold);text-shadow:0 0 60px rgba(197,160,89,0.4),0 2px 4px rgba(0,0,0,0.9);
+  line-height:1.15;text-transform:uppercase;
+}
+.menu-logo .of{
+  font-size:clamp(13px,3.2vw,18px);
+  color:rgba(204,197,185,0.7);letter-spacing:8px;font-weight:400;
+}
+.divider{
+  width:110px;height:1px;margin:18px auto;
+  background:linear-gradient(to right,transparent,var(--gold-dim),transparent);
+}
+.menu-btns{display:flex;flex-direction:column;gap:10px;width:260px;}
+.menu-btn{
+  background:transparent;border:1px solid var(--border);color:var(--text);
+  padding:15px 30px;font-family:var(--font-d);font-size:13px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.25s ease;position:relative;overflow:hidden;
+}
+.menu-btn::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(197,160,89,0.05),transparent);
+  transform:translateX(-100%);transition:transform 0.5s;
+}
+.menu-btn:hover::after{transform:translateX(100%);}
+.menu-btn:hover{border-color:var(--gold-dim);color:var(--gold);box-shadow:0 0 20px rgba(197,160,89,0.1);}
+.menu-btn.primary{border-color:var(--gold-dim);color:var(--gold);background:rgba(197,160,89,0.04);}
+.menu-btn.primary:hover{background:rgba(197,160,89,0.1);}
+
+/* ── STORY ───────────────────────────────────── */
+#screen-story{
+  align-items:center;justify-content:center;padding:40px 28px;
+  background:radial-gradient(ellipse at 50% 30%,#10101e 0%,var(--bg) 70%);
+}
+.story-wrap{text-align:center;max-width:360px;}
+.story-chapter{font-family:var(--font-d);font-size:10px;letter-spacing:5px;color:var(--gold-dim);margin-bottom:28px;}
+.story-npc{font-family:var(--font-d);font-size:10px;letter-spacing:3px;color:var(--gold);margin-bottom:8px;}
+.story-quote{
+  font-size:14px;line-height:2;color:var(--text);font-style:italic;
+  margin-bottom:36px;border-left:2px solid var(--gold-dim);padding-left:18px;text-align:left;
+}
+
+/* ── WORLD MAP ───────────────────────────────── */
+#screen-map{overflow-y:auto;padding:0;}
+.map-header{
+  text-align:center;padding:56px 20px 20px;
+  border-bottom:1px solid var(--border);margin-bottom:0;
+}
+.map-header h2{font-family:var(--font-d);font-size:18px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;margin-bottom:6px;}
+.map-header p{font-size:11px;color:var(--muted);}
+.map-body{padding:16px;}
+.region-card{
+  border:1px solid var(--border);margin-bottom:10px;padding:16px;
+  cursor:pointer;transition:all 0.22s ease;position:relative;
+  background:var(--panel);overflow:hidden;
+}
+.region-card::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--gold-dim);
+}
+.region-card:hover:not(.locked){border-color:var(--gold-dim);background:rgba(20,18,14,0.96);}
+.region-card.locked{opacity:0.35;cursor:not-allowed;}
+.region-name{font-family:var(--font-d);font-size:14px;color:var(--gold);letter-spacing:2px;margin-bottom:3px;}
+.region-sub{font-size:11px;color:var(--muted);letter-spacing:1px;}
+.region-badge{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  font-size:9px;letter-spacing:2px;padding:3px 9px;border:1px solid;font-family:var(--font-d);
+}
+.badge-open{border-color:var(--gold-dim);color:var(--gold);}
+.badge-lock{border-color:var(--border);color:var(--muted);}
+.enc-list{display:none;flex-direction:column;gap:6px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.enc-list.open{display:flex;}
+.enc-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 12px;border:1px solid #1c1a16;cursor:pointer;
+  transition:all 0.2s;background:rgba(10,10,14,0.8);
+}
+.enc-row:hover{border-color:var(--gold-dim);background:rgba(197,160,89,0.03);}
+.enc-name{font-size:13px;letter-spacing:1px;}
+.enc-name.boss-type{color:var(--gold);font-family:var(--font-d);}
+.enc-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.enc-fight{
+  font-family:var(--font-d);font-size:9px;letter-spacing:2px;
+  padding:6px 11px;border:1px solid var(--gold-dim);color:var(--gold);
+  background:transparent;cursor:pointer;transition:all 0.2s;
+}
+.enc-fight:hover{background:rgba(197,160,89,0.08);}
+
+/* ── CAMERA CHECK SCREEN ─────────────────────── */
+#screen-camera-check{
+  align-items:center;padding:16px;
+  background:radial-gradient(ellipse at 50% 0%,#0e0e18 0%,var(--bg) 70%);
+  overflow-y:auto;
+}
+.cam-header{text-align:center;padding:42px 0 18px;}
+.cam-header h2{font-family:var(--font-d);font-size:22px;letter-spacing:5px;color:var(--gold);text-transform:uppercase;}
+.cam-header p{font-size:11px;color:var(--muted);margin-top:8px;letter-spacing:1px;}
+
+.cam-preview-box{
+  width:100%;aspect-ratio:4/3;max-height:280px;
+  background:#040408;border:1px solid var(--border);
+  position:relative;overflow:hidden;margin-bottom:14px;
+}
+#check-canvas{
+  width:100%;height:100%;display:block;
+  transform:scaleX(-1);object-fit:cover;
+}
+.cam-no-cam{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  font-size:12px;color:var(--muted);letter-spacing:2px;
+}
+.cam-spinner{
+  width:36px;height:36px;border:2px solid var(--border);
+  border-top-color:var(--gold-dim);border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.cam-pose-pill{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.82);border:1px solid var(--border);
+  padding:5px 14px;font-family:var(--font-d);font-size:10px;
+  letter-spacing:2px;display:flex;align-items:center;gap:7px;white-space:nowrap;
+}
+.pdot{width:8px;height:8px;border-radius:50%;transition:background 0.3s;}
+
+.cam-hint{
+  font-size:12px;color:var(--muted);text-align:center;
+  line-height:1.7;margin-bottom:14px;max-width:320px;
+}
+.cam-privacy{
+  font-size:10px;color:var(--muted);text-align:center;
+  margin-bottom:18px;opacity:0.6;max-width:300px;line-height:1.6;
+}
+.cam-ready-banner{
+  font-family:var(--font-d);font-size:20px;letter-spacing:5px;
+  color:var(--green);text-align:center;margin-bottom:14px;
+  opacity:0;transition:opacity 0.5s;height:28px;
+}
+.cam-ready-banner.show{opacity:1;}
+.cam-btns{display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px;}
+.cam-btns button{
+  padding:13px;font-family:var(--font-d);font-size:12px;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;
+  border:1px solid;transition:all 0.2s;background:transparent;
+}
+#btn-start-battle{border-color:var(--gold-dim);color:var(--gold);}
+#btn-start-battle:hover{background:rgba(197,160,89,0.1);}
+#btn-start-battle:disabled{opacity:0.3;cursor:not-allowed;}
+#btn-training-mode{border-color:var(--border);color:var(--muted);font-size:10px;}
+#btn-training-mode:hover{border-color:var(--muted);color:var(--text);}
+
+/* ── BATTLE SCREEN ───────────────────────────── */
+#screen-battle{display:flex;flex-direction:column;background:var(--bg);overflow:hidden;}
+
+.battle-top{
+  padding:14px 18px 10px;
+  background:linear-gradient(180deg,rgba(8,8,14,0.99) 0%,transparent 100%);
+  display:flex;justify-content:space-between;align-items:flex-start;
+  position:relative;z-index:10;border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.mon-name{
+  font-family:var(--font-d);font-size:15px;letter-spacing:2px;
+  color:var(--gold);text-transform:uppercase;margin-bottom:6px;
+}
+.mon-name.boss-glow{font-size:17px;text-shadow:0 0 25px rgba(197,160,89,0.45);}
+.hp-row{display:flex;align-items:center;gap:8px;}
+.hp-lbl{font-size:10px;color:var(--muted);font-family:var(--font-d);letter-spacing:1px;min-width:24px;}
+.hp-bar{
+  width:150px;height:5px;background:#161616;
+  border:1px solid #2a2a2a;position:relative;overflow:hidden;
+}
+.hp-fill{
+  height:100%;background:linear-gradient(90deg,#7a1a1a,var(--red));
+  transition:width 0.35s ease;position:relative;
+}
+.hp-fill::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:rgba(255,255,255,0.13);}
+.hp-number{font-size:12px;color:var(--red-bright);font-family:var(--font-d);}
+
+.b-timer-wrap{text-align:right;}
+.b-timer-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:3px;}
+.b-timer{
+  font-family:var(--font-d);font-size:30px;font-weight:700;
+  color:var(--text);letter-spacing:2px;transition:color 0.3s;
+}
+.b-timer.urgent{color:var(--red-bright);animation:urgentPulse 0.7s ease infinite;}
+@keyframes urgentPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.battle-arena{
+  flex:1;min-height:0;position:relative;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  overflow:hidden;
+}
+.arena-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 80%,rgba(28,16,8,0.7) 0%,transparent 55%),
+             linear-gradient(180deg,#0a0a14 0%,#0e0c10 50%,#0a0808 100%);
+}
+.arena-bg::after{
+  content:'';position:absolute;bottom:25%;left:8%;right:8%;height:1px;
+  background:linear-gradient(to right,transparent,rgba(197,160,89,0.12),transparent);
+}
+.mon-wrap{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;}
+.mon-gfx{
+  width:130px;height:130px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;position:relative;
+  transition:all 0.15s ease;
+}
+.mon-gfx::before{
+  content:'';position:absolute;inset:-8px;border-radius:50%;
+  border:1px solid rgba(197,160,89,0.08);
+  box-shadow:0 0 40px rgba(0,0,0,0.9) inset;
+}
+.mon-svg{width:115px;height:115px;transition:filter 0.12s;}
+
+/* Floating damage */
+.dmg-float{
+  position:absolute;top:8px;right:16px;z-index:25;
+  font-family:var(--font-d);font-size:34px;font-weight:700;
+  color:var(--red-bright);text-shadow:0 0 20px var(--red),0 2px 0 #000;
+  pointer-events:none;opacity:0;
+}
+.dmg-float.pop{animation:dmgPop 0.85s ease forwards;}
+@keyframes dmgPop{
+  0%{opacity:1;transform:translateY(0) scale(1.6)}
+  25%{opacity:1;transform:translateY(-18px) scale(1)}
+  100%{opacity:0;transform:translateY(-50px) scale(0.85)}
+}
+.strike-banner{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:25;font-family:var(--font-d);font-size:20px;letter-spacing:4px;
+  text-shadow:0 0 30px currentColor,0 2px 0 #000;
+  pointer-events:none;opacity:0;white-space:nowrap;
+}
+.strike-banner.pop{animation:strikePop 1.1s ease forwards;}
+@keyframes strikePop{
+  0%{opacity:0;transform:translate(-50%,-65%) scale(0.75)}
+  15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+  40%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-42%)}
+}
+.atk-flash{
+  position:absolute;inset:0;z-index:20;pointer-events:none;
+  background:rgba(192,57,43,0.14);opacity:0;transition:opacity 0.12s;
+}
+.atk-flash.show{opacity:1;}
+
+/* ── BATTLE HUD BOTTOM ─────────────────────── */
+.b-hud{
+  padding:10px 14px 10px;flex-shrink:0;
+  background:linear-gradient(0deg,rgba(4,4,7,0.99),rgba(8,8,14,0.93));
+  border-top:1px solid var(--border);position:relative;z-index:10;
+}
+.streak-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;}
+.streak-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:2px;}
+.streak-num{
+  font-family:var(--font-d);font-size:26px;font-weight:700;
+  color:var(--gold);letter-spacing:2px;transition:color 0.3s,text-shadow 0.3s;
+}
+.streak-num.s2{color:#e8c060;text-shadow:0 0 16px rgba(232,192,96,0.5);}
+.streak-num.s3{color:#ff9900;text-shadow:0 0 25px rgba(255,153,0,0.6);}
+.streak-num.s4{color:#ff5500;text-shadow:0 0 35px rgba(255,85,0,0.7);}
+.streak-num.s5{color:#ff2200;text-shadow:0 0 50px rgba(255,34,0,0.9),0 0 80px rgba(255,34,0,0.3);}
+.best-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:2px;text-align:right;}
+.best-val{font-size:15px;color:var(--text);font-family:var(--font-d);}
+
+.stats-row{display:flex;gap:8px;margin-bottom:8px;}
+.stat-box{flex:1;background:rgba(255,255,255,0.02);border:1px solid var(--border);padding:7px 10px;}
+.stat-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:3px;}
+.stat-val{font-size:17px;font-family:var(--font-d);color:var(--text);}
+
+.milestone-bar{
+  font-size:10px;color:var(--gold-dim);text-align:center;
+  height:14px;letter-spacing:1px;margin-bottom:8px;
+}
+
+/* ── CAMERA VIEW IN BATTLE ─────────────────── */
+.battle-cam-wrap{
+  border:1px solid var(--border);position:relative;overflow:hidden;
+  background:#040408;margin-bottom:8px;
+}
+#battle-canvas{
+  width:100%;height:140px;display:block;
+  transform:scaleX(-1);object-fit:cover;
+}
+.battle-pose-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 10px;background:rgba(0,0,0,0.85);
+  border-top:1px solid var(--border);font-size:10px;letter-spacing:2px;
+}
+.bpdot{width:7px;height:7px;border-radius:50%;transition:background 0.3s;}
+
+/* Training mode controls */
+.train-wrap{}
+.train-lbl{font-size:8px;letter-spacing:3px;color:var(--gold-dim);text-align:center;margin-bottom:7px;}
+.train-controls{display:flex;gap:8px;}
+.rep-btn{
+  flex:1;padding:16px;
+  background:linear-gradient(180deg,rgba(27,55,27,0.85),rgba(14,38,14,0.92));
+  border:1px solid var(--green-dim);color:#80ff80;
+  font-family:var(--font-d);font-size:12px;letter-spacing:2px;
+  cursor:pointer;transition:all 0.15s;text-transform:uppercase;
+}
+.rep-btn:hover{border-color:var(--green);box-shadow:0 0 18px rgba(39,174,96,0.18);}
+.rep-btn:active{transform:translateY(2px);}
+.break-btn{
+  padding:14px 12px;background:rgba(90,16,16,0.4);
+  border:1px solid var(--red-dim);color:#ff8080;
+  font-family:var(--font-d);font-size:9px;letter-spacing:1px;
+  cursor:pointer;transition:all 0.15s;text-transform:uppercase;
+}
+.break-btn:hover{background:rgba(130,26,26,0.6);border-color:var(--red);}
+
+/* ── VICTORY ─────────────────────────────────── */
+#screen-victory{
+  align-items:center;justify-content:center;padding:28px 18px;
+  background:radial-gradient(ellipse at 50% 30%,#14120a 0%,var(--bg) 70%);
+}
+.victory-title{
+  font-family:var(--font-d);font-size:38px;letter-spacing:6px;
+  color:var(--gold);text-shadow:0 0 50px rgba(197,160,89,0.5);margin-bottom:6px;
+}
+.victory-sub{font-family:var(--font-d);font-size:11px;letter-spacing:3px;color:var(--muted);margin-bottom:28px;}
+.results-panel{
+  width:100%;max-width:340px;border:1px solid var(--border);
+  background:var(--panel);padding:20px;margin-bottom:20px;
+}
+.res-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px solid #181614;font-size:12px;
+}
+.res-row:last-child{border:none;}
+.res-lbl{color:var(--muted);letter-spacing:1px;}
+.res-val{color:var(--gold);font-family:var(--font-d);font-size:15px;}
+.res-val.hl{text-shadow:0 0 10px rgba(197,160,89,0.35);}
+.rec-badge{
+  background:rgba(197,160,89,0.12);border:1px solid var(--gold-dim);
+  color:var(--gold);padding:7px 18px;font-family:var(--font-d);
+  font-size:11px;letter-spacing:3px;margin-bottom:14px;text-align:center;display:none;
+}
+.rec-badge.show{display:block;}
+
+/* ── DEFEAT ──────────────────────────────────── */
+#screen-defeat{
+  align-items:center;justify-content:center;padding:28px 18px;
+  background:radial-gradient(ellipse at 50% 30%,#120808 0%,var(--bg) 70%);
+}
+.defeat-title{font-family:var(--font-d);font-size:22px;letter-spacing:4px;color:var(--muted);margin-bottom:8px;}
+.defeat-regen{font-size:12px;color:var(--red-bright);margin-bottom:28px;}
+.defeat-quote{font-style:italic;font-size:13px;color:var(--muted);margin:18px 0 26px;letter-spacing:1px;}
+
+/* ── SHARED ──────────────────────────────────── */
+.action-btn{
+  padding:13px 28px;background:transparent;border:1px solid var(--gold-dim);color:var(--gold);
+  font-family:var(--font-d);font-size:12px;letter-spacing:3px;cursor:pointer;
+  transition:all 0.2s;text-transform:uppercase;margin:5px;
+}
+.action-btn:hover{background:rgba(197,160,89,0.09);box-shadow:0 0 18px rgba(197,160,89,0.12);}
+.nav-back{
+  position:absolute;top:12px;left:14px;z-index:50;
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  padding:5px 10px;font-family:var(--font-d);font-size:9px;letter-spacing:2px;cursor:pointer;
+  transition:all 0.2s;
+}
+.nav-back:hover{border-color:var(--gold-dim);color:var(--gold);}
+
+/* ── MILESTONE FLASH ─────────────────────────── */
+.ms-flash{
+  position:fixed;inset:0;z-index:200;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;opacity:0;
+}
+.ms-flash.pop{animation:msPop 2s ease forwards;}
+.ms-inner{font-family:var(--font-d);text-align:center;text-shadow:0 0 40px currentColor;}
+.ms-title{font-size:28px;letter-spacing:5px;font-weight:800;}
+.ms-sub{font-size:12px;letter-spacing:4px;margin-top:8px;}
+@keyframes msPop{
+  0%{opacity:0;transform:scale(0.8)}15%{opacity:1;transform:scale(1.08)}
+  30%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:scale(1.04)}
+}
+
+/* ── ATTACK OVERLAY ──────────────────────────── */
+.global-flash{
+  position:fixed;inset:0;z-index:100;pointer-events:none;
+  background:rgba(192,57,43,0.1);opacity:0;transition:opacity 0.1s;
+}
+.global-flash.show{opacity:1;}
+
+/* ── SCREEN SHAKE ────────────────────────────── */
+.do-shake{animation:shake 0.4s ease;}
+@keyframes shake{
+  0%{transform:translate(0)}10%{transform:translate(-4px,2px)}
+  20%{transform:translate(4px,-2px)}30%{transform:translate(-3px,3px)}
+  40%{transform:translate(3px,-1px)}50%{transform:translate(-2px,2px)}
+  60%{transform:translate(2px,-2px)}70%{transform:translate(-1px,1px)}
+  80%{transform:translate(1px,-1px)}90%{transform:translate(-1px,0)}
+  100%{transform:translate(0)}
+}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- Global overlays -->
+<div class="global-flash" id="gflash"></div>
+<div class="ms-flash" id="msflash">
+  <div class="ms-inner" id="ms-inner">
+    <div class="ms-title" id="ms-title"></div>
+    <div class="ms-sub" id="ms-sub"></div>
+  </div>
+</div>
+
+<!-- Hidden shared video element for pose detection -->
+<video id="pose-video" autoplay muted playsinline style="display:none;position:absolute;"></video>
+
+<!-- ══════════════════════════════════════════════════
+     S1 — MAIN MENU
+══════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-menu">
+  <div class="menu-logo">
+    <div class="eyebrow">A Dark Fantasy Combat Experience</div>
+    <h1>RISE OF THE<br/><span class="of">REPBORN</span></h1>
+    <div class="divider"></div>
+  </div>
+  <div class="menu-btns">
+    <button class="menu-btn primary" onclick="showScreen('screen-story')">▶ Begin Journey</button>
+    <button class="menu-btn" onclick="showScreen('screen-map')">World Map</button>
+    <button class="menu-btn" onclick="alert('Character screen coming soon.')">Character</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S2 — STORY INTRO
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-story">
+  <button class="nav-back" onclick="showScreen('screen-menu')">← BACK</button>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px 24px;background:radial-gradient(ellipse at 50% 30%,#10101e,var(--bg) 70%)">
+    <div class="story-wrap">
+      <div class="story-chapter">CHAPTER I — THE RIFT AWAKENS</div>
+      <div class="story-npc">ELDER KAEL</div>
+      <blockquote class="story-quote">
+        "The sky above Aetheria has split open.<br/>
+        Something ancient... is pouring through."<br/><br/>
+        "The old scrolls speak of a warrior —<br/>
+        the <em>Repborn</em> — whose physical strength alone<br/>
+        can seal what has been broken."<br/><br/>
+        "I believe that warrior... is you."
+      </blockquote>
+      <button class="action-btn" onclick="showScreen('screen-map')">Enter the World →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S3 — WORLD MAP
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-map">
+  <button class="nav-back" onclick="showScreen('screen-menu')">← BACK</button>
+  <div class="map-header">
+    <h2>🗺 World of Aetheria</h2>
+    <p>One region unlocked. Conquer to reveal more.</p>
+  </div>
+  <div class="map-body">
+    <div class="region-card" onclick="toggleEnc('enc-r1')">
+      <div class="region-name">🌾 Forgotten Fields</div>
+      <div class="region-sub">Region I — The journey begins here</div>
+      <span class="region-badge badge-open">UNLOCKED</span>
+      <div class="enc-list" id="enc-r1">
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('rift_rat')">
+          <div><div class="enc-name">Rift Rat</div><div class="enc-meta">5 HP · 30s · Normal</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('mud_goblin')">
+          <div><div class="enc-name">Mud Goblin</div><div class="enc-meta">8 HP · 30s · Normal</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('dark_bat')">
+          <div><div class="enc-name">Dark Bat</div><div class="enc-meta">6 HP · 30s · Normal</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('corrupted_boar')">
+          <div><div class="enc-name">Corrupted Boar</div><div class="enc-meta">15 HP · 45s · Normal</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('goblin_brute')">
+          <div><div class="enc-name boss-type">⚔ Goblin Brute</div><div class="enc-meta">20 HP · 45s · Mini-Boss</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+        <div class="enc-row" onclick="event.stopPropagation();triggerBattle('rift_wolf')">
+          <div><div class="enc-name boss-type">👑 RIFT WOLF</div><div class="enc-meta">25 HP · 20s · BOSS</div></div>
+          <button class="enc-fight">FIGHT</button>
+        </div>
+      </div>
+    </div>
+    <div class="region-card locked"><div class="region-name">🌲 Whispering Woods</div><div class="region-sub">Region II</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">🪨 Bone Mountains</div><div class="region-sub">Region III</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">🌊 Sunken Kingdom</div><div class="region-sub">Region IV</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">🌋 Ashlands</div><div class="region-sub">Region V</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">❄️ Frozen Wastes</div><div class="region-sub">Region VI</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">🌑 Shadow Realm</div><div class="region-sub">Region VII</div><span class="region-badge badge-lock">LOCKED</span></div>
+    <div class="region-card locked"><div class="region-name">👑 The Rift</div><div class="region-sub">Region VIII — Final Destination</div><span class="region-badge badge-lock">LOCKED</span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S4 — CAMERA CHECK
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-camera-check">
+  <div class="cam-header">
+    <h2>Camera Check</h2>
+    <p>Preparing your combat sensor</p>
+  </div>
+
+  <div class="cam-preview-box" id="cam-box">
+    <div class="cam-no-cam" id="cam-no-cam">
+      <div class="cam-spinner"></div>
+      <span>Requesting camera access...</span>
+    </div>
+    <canvas id="check-canvas" style="display:none;"></canvas>
+    <div class="cam-pose-pill" id="check-pose-pill" style="display:none;">
+      <div class="pdot" id="check-pdot" style="background:#888"></div>
+      <span id="check-pose-txt">DETECTING POSE...</span>
+    </div>
+  </div>
+
+  <p class="cam-hint">
+    Stand far enough back so your <strong>full upper body</strong> and legs are visible.<br/>
+    Get into push-up position to calibrate.
+  </p>
+  <p class="cam-privacy">
+    🔒 All camera processing happens locally in your browser.<br/>
+    No footage is stored, recorded or uploaded.
+  </p>
+
+  <div class="cam-ready-banner" id="cam-ready-banner">✓ READY TO FIGHT</div>
+
+  <div class="cam-btns">
+    <button id="btn-start-battle" disabled onclick="proceedFromCameraCheck()">START BATTLE</button>
+    <button id="btn-training-mode" onclick="useTrainingMode()">SKIP — TRAIN WITHOUT CAMERA</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S5 — BATTLE
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-battle">
+
+  <!-- Top HUD -->
+  <div class="battle-top">
+    <div>
+      <div class="mon-name" id="b-mon-name">Rift Rat</div>
+      <div class="hp-row">
+        <div class="hp-lbl">HP</div>
+        <div class="hp-bar"><div class="hp-fill" id="b-hp-fill" style="width:100%"></div></div>
+        <div class="hp-number" id="b-hp-num">5</div>
+      </div>
+    </div>
+    <div class="b-timer-wrap">
+      <div class="b-timer-lbl">TIME</div>
+      <div class="b-timer" id="b-timer">00:30</div>
+    </div>
+  </div>
+
+  <!-- Arena -->
+  <div class="battle-arena" id="b-arena">
+    <div class="arena-bg"></div>
+    <div class="atk-flash" id="b-flash"></div>
+    <div class="mon-wrap" id="b-mon-wrap">
+      <div class="mon-gfx" id="b-mon-gfx">
+        <svg class="mon-svg" id="b-mon-svg" viewBox="0 0 120 120"></svg>
+      </div>
+    </div>
+    <div class="dmg-float" id="b-dmg">-3</div>
+    <div class="strike-banner" id="b-strike"></div>
+  </div>
+
+  <!-- Bottom HUD -->
+  <div class="b-hud">
+    <div class="streak-row">
+      <div>
+        <div class="streak-lbl">🔥 STREAK</div>
+        <div class="streak-num" id="b-streak">× 0</div>
+      </div>
+      <div>
+        <div class="best-lbl">SESSION BEST</div>
+        <div class="best-val" id="b-best">0</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-lbl">REPS</div><div class="stat-val" id="b-reps">0</div></div>
+      <div class="stat-box"><div class="stat-lbl">ATTACK</div><div class="stat-val" id="b-atk">×1</div></div>
+      <div class="stat-box"><div class="stat-lbl">DMG</div><div class="stat-val" id="b-dmg-total">0</div></div>
+    </div>
+
+    <div class="milestone-bar" id="b-milestone"></div>
+
+    <!-- Camera live view (shown when camera is active) -->
+    <div id="cam-view" style="display:none;">
+      <div class="battle-cam-wrap">
+        <canvas id="battle-canvas"></canvas>
+        <div class="battle-pose-bar">
+          <div class="bpdot" id="b-pdot" style="background:#888"></div>
+          <span id="b-pose-txt" style="font-size:10px;letter-spacing:2px;">DETECTING...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training mode controls (shown when camera is disabled) -->
+    <div id="train-view">
+      <div class="train-lbl">⚡ TRAINING MODE — CAMERA DISABLED</div>
+      <div class="train-controls">
+        <button class="rep-btn" onclick="doRep()">⚔ ATTACK REP</button>
+        <button class="break-btn" onclick="doBreakStreak()">BREAK<br/>STREAK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S6 — VICTORY
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-victory">
+  <div class="victory-title">VICTORY</div>
+  <div class="victory-sub" id="v-sub">THE RIFT RAT HAS FALLEN</div>
+  <div class="rec-badge" id="v-rec">🔥 NEW PERSONAL RECORD!</div>
+  <div class="results-panel">
+    <div class="res-row"><span class="res-lbl">XP GAINED</span><span class="res-val" id="v-xp">+20 XP</span></div>
+    <div class="res-row"><span class="res-lbl">GOLD GAINED</span><span class="res-val" id="v-gold">+10</span></div>
+    <div class="res-row"><span class="res-lbl">REPS PERFORMED</span><span class="res-val" id="v-reps">0</span></div>
+    <div class="res-row"><span class="res-lbl">BEST STREAK</span><span class="res-val hl" id="v-streak">0</span></div>
+    <div class="res-row"><span class="res-lbl">DAMAGE DEALT</span><span class="res-val" id="v-dmg">0</span></div>
+  </div>
+  <div><button class="action-btn" onclick="showScreen('screen-map')">Continue →</button></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     S7 — DEFEAT
+══════════════════════════════════════════════════ -->
+<div class="screen" id="screen-defeat">
+  <div class="defeat-title">THE DARKNESS REMAINS...</div>
+  <div class="defeat-regen" id="d-regen">The Rift Wolf regenerates.</div>
+  <div class="results-panel" style="max-width:320px;margin-bottom:12px;">
+    <div class="res-row"><span class="res-lbl">REPS PERFORMED</span><span class="res-val" id="d-reps">0</span></div>
+    <div class="res-row"><span class="res-lbl">BEST STREAK</span><span class="res-val" id="d-streak">0</span></div>
+    <div class="res-row"><span class="res-lbl">DAMAGE DEALT</span><span class="res-val" id="d-dmg">0</span></div>
+  </div>
+  <div class="defeat-quote">"Train. Return. Finish the fight."</div>
+  <div>
+    <button class="action-btn" onclick="retryBattle()">↺ TRY AGAIN</button>
+    <button class="action-btn" onclick="showScreen('screen-map')">Return to Camp</button>
+  </div>
+</div>
+
+</div><!-- #root -->
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════
+//  GAME DATA
+// ═══════════════════════════════════════════════
+const MONSTERS = {
+  rift_rat:       {name:'Rift Rat',       hp:5,  time:30, type:'normal',   xp:8,   gold:3 },
+  mud_goblin:     {name:'Mud Goblin',     hp:8,  time:30, type:'normal',   xp:12,  gold:5 },
+  dark_bat:       {name:'Dark Bat',       hp:6,  time:30, type:'normal',   xp:10,  gold:4 },
+  corrupted_boar: {name:'Corrupted Boar', hp:15, time:45, type:'normal',   xp:25,  gold:10},
+  goblin_brute:   {name:'Goblin Brute',   hp:20, time:45, type:'miniboss', xp:50,  gold:20},
+  rift_wolf:      {name:'RIFT WOLF',      hp:25, time:20, type:'boss',     xp:120, gold:50},
+};
+
+const STRIKES = [
+  {min:0,  name:'BASIC STRIKE',    dmg:1, mul:'×1', color:'#ccc5b9', cls:''},
+  {min:5,  name:'HEAVY STRIKE',    dmg:2, mul:'×2', color:'#c5a059', cls:'s2'},
+  {min:10, name:'POWER STRIKE',    dmg:3, mul:'×3', color:'#e8a030', cls:'s2'},
+  {min:20, name:'CRITICAL STRIKE', dmg:4, mul:'×4', color:'#ff9900', cls:'s3'},
+  {min:30, name:'BERSERKER SMASH', dmg:6, mul:'×6', color:'#ff5500', cls:'s4'},
+  {min:40, name:'LEGENDARY STRIKE',dmg:9, mul:'×9', color:'#ff2200', cls:'s5'},
+];
+const MILESTONES = [5,10,20,30,40,50];
+
+// ═══════════════════════════════════════════════
+//  BATTLE STATE
+// ═══════════════════════════════════════════════
+const G = {
+  monKey:null, mon:null,
+  hp:0, maxHp:0, timeLeft:0,
+  streak:0, bestStreak:0, reps:0, totalDmg:0,
+  timerID:null, over:false,
+  globalBest: parseInt(localStorage.getItem('repborn_best')||'0'),
+};
+
+// ═══════════════════════════════════════════════
+//  CAMERA / POSE STATE
+// ═══════════════════════════════════════════════
+const CAM = {
+  enabled:false,        // camera is live
+  training:false,       // training mode (no camera)
+  ready:false,          // camera initialized
+  stream:null,
+  pose:null,
+  mpCamera:null,
+  pendingKey:null,      // monster to fight after camera check
+
+  // Push-up state machine
+  phase:'IDLE',         // IDLE | READY | DOWN
+  readyFrames:0,
+  READY_NEEDED:25,      // frames in UP position to confirm READY
+  lastRepMs:0,
+  MIN_REP_MS:700,       // anti-double-count
+
+  // Thresholds (configurable)
+  upAngle:148,          // elbow angle = "UP / arms extended"
+  downAngle:95,         // elbow angle = "DOWN / bent"
+
+  // Check-screen calibration
+  checkReadyFrames:0,
+  CHECK_READY_NEEDED:45, // ~1.5s of good position on check screen
+  checkReadyShown:false,
+};
+
+// ═══════════════════════════════════════════════
+//  SCREEN ROUTER
+// ═══════════════════════════════════════════════
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function toggleEnc(id){
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════
+//  BATTLE TRIGGER (from map)
+// ═══════════════════════════════════════════════
+function triggerBattle(key){
+  CAM.pendingKey = key;
+  if(CAM.ready || CAM.training){
+    // Camera already set up — go straight to battle
+    doStartBattle(key);
+  } else {
+    // First time — go to camera check
+    showScreen('screen-camera-check');
+    initCameraCheck();
+  }
+}
+
+function retryBattle(){
+  if(CAM.pendingKey) doStartBattle(CAM.pendingKey);
+}
+
+// ═══════════════════════════════════════════════
+//  CAMERA CHECK SCREEN
+// ═══════════════════════════════════════════════
+async function initCameraCheck(){
+  CAM.checkReadyFrames = 0;
+  CAM.checkReadyShown = false;
+  document.getElementById('btn-start-battle').disabled = true;
+  document.getElementById('cam-ready-banner').classList.remove('show');
+  document.getElementById('check-canvas').style.display = 'none';
+  document.getElementById('cam-no-cam').style.display = 'flex';
+  document.getElementById('check-pose-pill').style.display = 'none';
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'user'}, width:{ideal:640}, height:{ideal:480}},
+      audio:false
+    });
+    CAM.stream = stream;
+    const video = document.getElementById('pose-video');
+    video.srcObject = stream;
+    await video.play();
+
+    document.getElementById('cam-no-cam').style.display = 'none';
+    document.getElementById('check-canvas').style.display = 'block';
+    document.getElementById('check-pose-pill').style.display = 'flex';
+
+    initMediaPipe('check');
+
+  } catch(err){
+    console.warn('Camera error:', err);
+    document.getElementById('cam-no-cam').innerHTML =
+      '<span style="color:var(--red-bright);font-size:11px;letter-spacing:2px;text-align:center;padding:10px">Camera access denied.<br/>Use Training Mode below.</span>';
+    document.getElementById('btn-training-mode').style.borderColor = 'var(--gold-dim)';
+    document.getElementById('btn-training-mode').style.color = 'var(--gold)';
+  }
+}
+
+function proceedFromCameraCheck(){
+  CAM.enabled = true;
+  CAM.ready = true;
+  CAM.training = false;
+  // Switch MP camera target to battle canvas
+  CAM.phase = 'IDLE';
+  CAM.readyFrames = 0;
+  doStartBattle(CAM.pendingKey);
+}
+
+function useTrainingMode(){
+  stopCamera();
+  CAM.training = true;
+  CAM.ready = true;
+  CAM.enabled = false;
+  doStartBattle(CAM.pendingKey);
+}
+
+// ═══════════════════════════════════════════════
+//  MEDIAPIPE INIT
+// ═══════════════════════════════════════════════
+function initMediaPipe(target){
+  if(CAM.pose){
+    // Already initialised — just switch target canvas
+    switchMPTarget(target);
+    return;
+  }
+
+  const pose = new Pose({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+  });
+
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    smoothSegmentation: false,
+    minDetectionConfidence: 0.55,
+    minTrackingConfidence: 0.55,
+  });
+
+  pose.onResults(results => onPoseResults(results, target === 'check' ? CAM._target || 'check' : CAM._target || 'battle'));
+
+  CAM.pose = pose;
+
+  const video = document.getElementById('pose-video');
+  const mpCam = new Camera(video, {
+    onFrame: async () => {
+      if(CAM.stream && CAM.pose) await CAM.pose.send({image: video});
+    },
+    width: 640, height: 480,
+  });
+  mpCam.start();
+  CAM.mpCamera = mpCam;
+  CAM._target = target;
+}
+
+function switchMPTarget(target){
+  CAM._target = target;
+}
+
+function stopCamera(){
+  if(CAM.stream){
+    CAM.stream.getTracks().forEach(t=>t.stop());
+    CAM.stream = null;
+  }
+  if(CAM.mpCamera){
+    CAM.mpCamera.stop();
+    CAM.mpCamera = null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  POSE RESULTS HANDLER
+// ═══════════════════════════════════════════════
+function onPoseResults(results, target){
+  const isCheck = target === 'check';
+  const canvasId = isCheck ? 'check-canvas' : 'battle-canvas';
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const video = document.getElementById('pose-video');
+
+  // Match canvas size to display size
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+
+  // Draw mirrored video
+  ctx.save();
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  // Dark vignette overlay
+  const grad = ctx.createRadialGradient(
+    canvas.width/2, canvas.height/2, canvas.height*0.25,
+    canvas.width/2, canvas.height/2, canvas.height*0.75
+  );
+  grad.addColorStop(0,'rgba(0,0,0,0)');
+  grad.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  if(!results.poseLandmarks){
+    setPoseStatus(isCheck,'red','NO POSE DETECTED');
+    if(!isCheck) CAM.phase = 'IDLE';
+    return;
+  }
+
+  const lm = results.poseLandmarks;
+
+  // Draw skeleton (mirrored — canvas already mirrored via CSS)
+  drawSkeleton(ctx, lm, canvas.width, canvas.height);
+
+  // Detect push-up
+  detectPushUp(lm, isCheck);
+}
+
+// ═══════════════════════════════════════════════
+//  SKELETON DRAWING
+// ═══════════════════════════════════════════════
+const CONNECTIONS = [
+  // Arms
+  [11,13],[13,15],   // L shoulder→elbow→wrist
+  [12,14],[14,16],   // R shoulder→elbow→wrist
+  [15,17],[15,19],[17,19], // L hand
+  [16,18],[16,20],[18,20], // R hand
+  // Torso
+  [11,12],[23,24],[11,23],[12,24],
+  // Legs
+  [23,25],[25,27],[27,29],[27,31],[29,31],
+  [24,26],[26,28],[28,30],[28,32],[30,32],
+];
+const ARM_JOINTS = new Set([11,12,13,14,15,16,17,18,19,20]);
+
+function drawSkeleton(ctx, lm, w, h){
+  const toX = (l) => (1 - l.x) * w;  // mirror X because canvas CSS is mirrored
+  const toY = (l) => l.y * h;
+
+  // Draw connections
+  for(const [a,b] of CONNECTIONS){
+    const la = lm[a], lb = lm[b];
+    if(!la || !lb) continue;
+    if(la.visibility < 0.4 || lb.visibility < 0.4) continue;
+    const isArm = ARM_JOINTS.has(a) && ARM_JOINTS.has(b);
+    ctx.beginPath();
+    ctx.moveTo(toX(la), toY(la));
+    ctx.lineTo(toX(lb), toY(lb));
+    ctx.strokeStyle = isArm ? 'rgba(197,160,89,0.85)' : 'rgba(197,160,89,0.35)';
+    ctx.lineWidth = isArm ? 2.5 : 1.5;
+    ctx.stroke();
+  }
+
+  // Draw landmark dots
+  for(let i=0;i<33;i++){
+    const l = lm[i];
+    if(!l || l.visibility < 0.4) continue;
+    const isArm = ARM_JOINTS.has(i);
+    ctx.beginPath();
+    ctx.arc(toX(l), toY(l), isArm ? 5 : 3, 0, Math.PI*2);
+    ctx.fillStyle = isArm ? 'rgba(255,200,80,0.95)' : 'rgba(197,160,89,0.6)';
+    ctx.fill();
+    if(isArm){
+      ctx.strokeStyle='rgba(0,0,0,0.5)';
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+  }
+
+  // Show elbow angle on canvas
+  const leftAngle  = elbowAngle(lm[11], lm[13], lm[15]);
+  const rightAngle = elbowAngle(lm[12], lm[14], lm[16]);
+  if(leftAngle && lm[13].visibility > 0.5){
+    const ex = toX(lm[13]), ey = toY(lm[13]);
+    ctx.font = 'bold 13px Inter,sans-serif';
+    ctx.fillStyle = 'rgba(197,160,89,0.9)';
+    ctx.fillText(Math.round(leftAngle)+'°', ex+8, ey-8);
+  }
+  if(rightAngle && lm[14].visibility > 0.5){
+    const ex = toX(lm[14]), ey = toY(lm[14]);
+    ctx.font = 'bold 13px Inter,sans-serif';
+    ctx.fillStyle = 'rgba(197,160,89,0.9)';
+    ctx.fillText(Math.round(rightAngle)+'°', ex+8, ey-8);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  PUSH-UP DETECTION
+// ═══════════════════════════════════════════════
+function elbowAngle(shoulder, elbow, wrist){
+  if(!shoulder || !elbow || !wrist) return null;
+  if(elbow.visibility < 0.4) return null;
+  return angle3D(shoulder, elbow, wrist);
+}
+
+function angle3D(a, b, c){
+  // angle at point b, using 3D coords
+  const ba = {x:a.x-b.x, y:a.y-b.y, z:(a.z||0)-(b.z||0)};
+  const bc = {x:c.x-b.x, y:c.y-b.y, z:(c.z||0)-(b.z||0)};
+  const dot = ba.x*bc.x + ba.y*bc.y + ba.z*bc.z;
+  const magBA = Math.sqrt(ba.x**2+ba.y**2+ba.z**2);
+  const magBC = Math.sqrt(bc.x**2+bc.y**2+bc.z**2);
+  if(!magBA||!magBC) return 180;
+  return Math.acos(Math.min(1,Math.max(-1,dot/(magBA*magBC)))) * (180/Math.PI);
+}
+
+function detectPushUp(lm, isCheck){
+  const L_SHOULDER=11, L_ELBOW=13, L_WRIST=15;
+  const R_SHOULDER=12, R_ELBOW=14, R_WRIST=16;
+  const L_HIP=23, R_HIP=24;
+
+  const lAngle = elbowAngle(lm[L_SHOULDER], lm[L_ELBOW], lm[L_WRIST]);
+  const rAngle = elbowAngle(lm[R_SHOULDER], lm[R_ELBOW], lm[R_WRIST]);
+
+  const bothVisible = (
+    lm[L_ELBOW].visibility > 0.45 &&
+    lm[R_ELBOW].visibility > 0.45
+  );
+
+  if(!bothVisible || lAngle===null || rAngle===null){
+    setPoseStatus(isCheck, 'yellow', 'MOVE INTO FRAME');
+    return;
+  }
+
+  const avgAngle = (lAngle + rAngle) / 2;
+
+  // Determine if body is horizontal (push-up position vs standing)
+  const shoulderY = (lm[L_SHOULDER].y + lm[R_SHOULDER].y) / 2;
+  const hipY      = (lm[L_HIP].y    + lm[R_HIP].y)     / 2;
+  const bodyDiff  = Math.abs(shoulderY - hipY);
+  const isHorizontal = bodyDiff < 0.28; // low diff = horizontal body
+
+  if(!isHorizontal){
+    setPoseStatus(isCheck, 'red', 'GET INTO PUSH-UP POSITION');
+    if(!isCheck){ CAM.phase = 'IDLE'; CAM.readyFrames = 0; }
+    else { CAM.checkReadyFrames = 0; CAM.checkReadyShown = false; hideCamReady(); }
+    return;
+  }
+
+  // ── STATE MACHINE ──────────────────────────────
+  const UP   = CAM.upAngle;
+  const DOWN = CAM.downAngle;
+
+  if(isCheck){
+    // Camera check screen: just track readiness
+    if(avgAngle >= UP){
+      CAM.checkReadyFrames++;
+      setPoseStatus(true, 'green', `GOOD POSITION — ${Math.round(avgAngle)}°`);
+      if(CAM.checkReadyFrames >= CAM.CHECK_READY_NEEDED && !CAM.checkReadyShown){
+        CAM.checkReadyShown = true;
+        showCamReady();
+      }
+    } else if(avgAngle <= DOWN){
+      setPoseStatus(true, 'yellow', `GO LOWER — ${Math.round(avgAngle)}°`);
+      CAM.checkReadyFrames = 0;
+    } else {
+      setPoseStatus(true, 'yellow', `EXTEND ARMS — ${Math.round(avgAngle)}°`);
+      CAM.checkReadyFrames = Math.max(0, CAM.checkReadyFrames - 2);
+    }
+    return;
+  }
+
+  // ── BATTLE PHASE ────────────────────────────────
+  if(avgAngle >= UP){
+    if(CAM.phase === 'DOWN'){
+      // Completed one push-up!
+      const now = Date.now();
+      if(now - CAM.lastRepMs >= CAM.MIN_REP_MS){
+        CAM.lastRepMs = now;
+        CAM.phase = 'READY';
+        doRep(); // Count the rep!
+      }
+    } else {
+      // Idle or already READY
+      CAM.readyFrames++;
+      if(CAM.readyFrames >= CAM.READY_NEEDED && CAM.phase === 'IDLE'){
+        CAM.phase = 'READY';
+      }
+    }
+    if(CAM.phase === 'READY'){
+      setPoseStatus(false, 'green', `GOOD POSITION — GO LOWER`);
+    }
+
+  } else if(avgAngle <= DOWN){
+    if(CAM.phase === 'READY'){
+      CAM.phase = 'DOWN';
+      setPoseStatus(false, 'yellow', `DOWN — PUSH UP NOW!`);
+    } else if(CAM.phase === 'DOWN'){
+      setPoseStatus(false, 'yellow', `PUSH UP! — ${Math.round(avgAngle)}°`);
+    } else {
+      setPoseStatus(false, 'yellow', `MOVE LOWER — ${Math.round(avgAngle)}°`);
+    }
+
+  } else {
+    // Mid-range
+    if(CAM.phase === 'IDLE'){
+      CAM.readyFrames = Math.max(0, CAM.readyFrames-1);
+      setPoseStatus(false, 'yellow', `EXTEND ARMS — ${Math.round(avgAngle)}°`);
+    } else if(CAM.phase === 'READY'){
+      setPoseStatus(false, 'green', `GO LOWER — ${Math.round(avgAngle)}°`);
+    } else if(CAM.phase === 'DOWN'){
+      setPoseStatus(false, 'yellow', `PUSH UP! — ${Math.round(avgAngle)}°`);
+    }
+  }
+}
+
+function setPoseStatus(isCheck, color, text){
+  const colors = {green:'#27ae60', yellow:'#f39c12', red:'#e74c3c'};
+  const dotId  = isCheck ? 'check-pdot' : 'b-pdot';
+  const txtId  = isCheck ? 'check-pose-txt' : 'b-pose-txt';
+  const dot    = document.getElementById(dotId);
+  const txt    = document.getElementById(txtId);
+  if(dot) dot.style.background = colors[color]||'#888';
+  if(txt) txt.textContent = text;
+}
+
+function showCamReady(){
+  document.getElementById('cam-ready-banner').classList.add('show');
+  document.getElementById('btn-start-battle').disabled = false;
+}
+function hideCamReady(){
+  document.getElementById('cam-ready-banner').classList.remove('show');
+  document.getElementById('btn-start-battle').disabled = true;
+}
+
+// ═══════════════════════════════════════════════
+//  BATTLE ENGINE
+// ═══════════════════════════════════════════════
+function doStartBattle(key){
+  const mon = MONSTERS[key];
+  if(!mon) return;
+
+  clearInterval(G.timerID);
+  G.monKey=key; G.mon=mon;
+  G.hp=mon.hp; G.maxHp=mon.hp;
+  G.timeLeft=mon.time;
+  G.streak=0; G.bestStreak=0;
+  G.reps=0; G.totalDmg=0;
+  G.over=false;
+
+  CAM.phase='IDLE'; CAM.readyFrames=0;
+
+  // Set up monster
+  document.getElementById('b-mon-svg').innerHTML = monSVG(key);
+  document.getElementById('b-mon-name').textContent = mon.name;
+  document.getElementById('b-mon-name').className = 'mon-name' + (mon.type==='boss' ? ' boss-glow' : '');
+
+  // Toggle camera vs training controls
+  document.getElementById('cam-view').style.display   = CAM.enabled ? 'block' : 'none';
+  document.getElementById('train-view').style.display = CAM.enabled ? 'none'  : 'block';
+
+  // If camera is live, switch pose target to battle canvas
+  if(CAM.enabled && CAM.pose){
+    switchMPTarget('battle');
+  }
+
+  updateHUD();
+  showScreen('screen-battle');
+
+  G.timerID = setInterval(tickTimer, 1000);
+}
+
+function tickTimer(){
+  if(G.over) return;
+  G.timeLeft--;
+  const s = G.timeLeft;
+  const el = document.getElementById('b-timer');
+  el.textContent = `00:${s<10?'0':''}${s}`;
+  el.className = 'b-timer' + (s<=10?' urgent':'');
+  if(s<=0) endBattle(false);
+}
+
+// ── REP (called by Training button OR detected push-up) ──
+function doRep(){
+  if(G.over) return;
+  G.reps++;
+  G.streak++;
+  if(G.streak > G.bestStreak) G.bestStreak = G.streak;
+
+  const st = getStrike(G.streak);
+  const dmg = st.dmg;
+  G.hp = Math.max(0, G.hp - dmg);
+  G.totalDmg += dmg;
+
+  playHit(dmg, st);
+  updateHUD();
+
+  if(G.hp <= 0) endBattle(true);
+}
+
+function doBreakStreak(){
+  if(G.over) return;
+  G.streak = 0;
+  showMS('STREAK BROKEN', 'The power fades...', '#cc3333');
+  updateHUD();
+}
+
+function getStrike(streak){
+  let r = STRIKES[0];
+  for(const s of STRIKES){ if(streak >= s.min) r = s; }
+  return r;
+}
+
+// ── HUD UPDATE ──
+function updateHUD(){
+  const st = getStrike(G.streak);
+  const pct = (G.hp / G.maxHp) * 100;
+
+  document.getElementById('b-hp-fill').style.width = pct+'%';
+  document.getElementById('b-hp-num').textContent  = G.hp;
+
+  const sEl = document.getElementById('b-streak');
+  sEl.textContent = `× ${G.streak}`;
+  sEl.className = 'streak-num ' + st.cls;
+
+  document.getElementById('b-best').textContent    = G.bestStreak;
+  document.getElementById('b-reps').textContent    = G.reps;
+  document.getElementById('b-atk').textContent     = st.mul;
+  document.getElementById('b-dmg-total').textContent = G.totalDmg;
+
+  const next = MILESTONES.find(m => m > G.streak);
+  const mEl  = document.getElementById('b-milestone');
+  if(next) mEl.textContent = `${next - G.streak} more for ${getStrike(next).name}`;
+  else mEl.textContent = '👑 LEGENDARY POWER — MAXIMUM STRIKE';
+}
+
+// ── HIT EFFECTS ──
+function playHit(dmg, st){
+  // Floating damage
+  const dEl = document.getElementById('b-dmg');
+  dEl.textContent = `-${dmg}`;
+  dEl.className = 'dmg-float';
+  void dEl.offsetWidth;
+  dEl.className = 'dmg-float pop';
+
+  // Strike name
+  const sEl = document.getElementById('b-strike');
+  sEl.textContent = st.name;
+  sEl.style.color = st.color;
+  sEl.className = 'strike-banner';
+  void sEl.offsetWidth;
+  sEl.className = 'strike-banner pop';
+
+  // Attack flash
+  const fl = document.getElementById('b-flash');
+  fl.className = 'atk-flash show';
+  setTimeout(()=>fl.className='atk-flash', 180);
+
+  const gfl = document.getElementById('gflash');
+  gfl.className = 'global-flash show';
+  setTimeout(()=>gfl.className='global-flash', 150);
+
+  // Monster flash
+  document.getElementById('b-mon-svg').innerHTML = monSVG(G.monKey, true);
+  document.getElementById('b-mon-gfx').style.filter = 'brightness(2.5)';
+  setTimeout(()=>{
+    document.getElementById('b-mon-svg').innerHTML = monSVG(G.monKey, false);
+    document.getElementById('b-mon-gfx').style.filter = '';
+  }, 180);
+
+  // Screen shake
+  const root = document.getElementById('root');
+  root.classList.add('do-shake');
+  setTimeout(()=>root.classList.remove('do-shake'), 400);
+
+  // Milestone flash
+  if(MILESTONES.includes(G.streak)){
+    showMS(st.name, `STREAK × ${G.streak}`, st.color);
+  }
+}
+
+function showMS(title, sub, color){
+  const el = document.getElementById('msflash');
+  document.getElementById('ms-title').textContent = title;
+  document.getElementById('ms-sub').textContent   = sub;
+  document.getElementById('ms-inner').style.color  = color || 'var(--gold)';
+  el.className = 'ms-flash';
+  void el.offsetWidth;
+  el.className = 'ms-flash pop';
+  setTimeout(()=>el.className='ms-flash', 2000);
+}
+
+// ── BATTLE END ──
+function endBattle(victory){
+  if(G.over) return;
+  G.over = true;
+  clearInterval(G.timerID);
+
+  const isRec = G.bestStreak > G.globalBest;
+  if(isRec){
+    G.globalBest = G.bestStreak;
+    localStorage.setItem('repborn_best', G.bestStreak);
+  }
+
+  // Switch pose target back to check (or stop if training)
+  if(CAM.enabled && CAM.pose) switchMPTarget('check');
+
+  if(victory){
+    document.getElementById('v-sub').textContent     = `THE ${G.mon.name.toUpperCase()} HAS FALLEN`;
+    document.getElementById('v-xp').textContent      = `+${G.mon.xp} XP`;
+    document.getElementById('v-gold').textContent    = `+${G.mon.gold}`;
+    document.getElementById('v-reps').textContent    = G.reps;
+    document.getElementById('v-streak').textContent  = `🔥 ${G.bestStreak}`;
+    document.getElementById('v-dmg').textContent     = G.totalDmg;
+    document.getElementById('v-rec').className       = 'rec-badge' + (isRec?' show':'');
+    showScreen('screen-victory');
+  } else {
+    document.getElementById('d-regen').textContent  = `The ${G.mon.name} regenerates.`;
+    document.getElementById('d-reps').textContent   = G.reps;
+    document.getElementById('d-streak').textContent = `🔥 ${G.bestStreak}`;
+    document.getElementById('d-dmg').textContent    = G.totalDmg;
+    showScreen('screen-defeat');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MONSTER SVGs
+// ═══════════════════════════════════════════════
+function monSVG(id, hit=false){
+  const f = (base) => hit ? '#ff5050' : base;
+  const s = {
+    rift_rat:`
+      <ellipse cx="60" cy="76" rx="28" ry="18" fill="${f('#2a2020')}"/>
+      <ellipse cx="60" cy="58" rx="20" ry="17" fill="${f('#221818')}"/>
+      <ellipse cx="47" cy="48" rx="8" ry="11" fill="${f('#1c1212')}"/>
+      <ellipse cx="73" cy="48" rx="8" ry="11" fill="${f('#1c1212')}"/>
+      <circle cx="53" cy="55" r="3.5" fill="${hit?'#ff3030':'#8a1a1a'}"/>
+      <circle cx="67" cy="55" r="3.5" fill="${hit?'#ff3030':'#8a1a1a'}"/>
+      <path d="M54 63 Q60 68 66 63" stroke="#6a1a1a" stroke-width="1.5" fill="none"/>
+      <path d="M88 72 Q103 63 110 75 Q103 79 88 76 Z" fill="${f('#1a1a1a')}"/>
+      <ellipse cx="60" cy="92" rx="20" ry="5" fill="rgba(0,0,0,0.25)"/>`,
+
+    mud_goblin:`
+      <ellipse cx="60" cy="80" rx="22" ry="20" fill="${f('#1e2a18')}"/>
+      <ellipse cx="60" cy="55" rx="18" ry="20" fill="${f('#192213')}"/>
+      <ellipse cx="44" cy="45" rx="7" ry="10" fill="${f('#141e0e')}"/>
+      <ellipse cx="76" cy="45" rx="7" ry="10" fill="${f('#141e0e')}"/>
+      <circle cx="54" cy="54" r="4" fill="#2a4a20"/>
+      <circle cx="66" cy="54" r="4" fill="#2a4a20"/>
+      <circle cx="54" cy="53" r="2" fill="${hit?'#ff4444':'#8a3a1a'}"/>
+      <circle cx="66" cy="53" r="2" fill="${hit?'#ff4444':'#8a3a1a'}"/>
+      <path d="M52 64 Q60 70 68 64" stroke="#3a5a28" stroke-width="2" fill="none"/>
+      <path d="M38 75 Q28 66 30 80 Q35 92 42 87 Z" fill="${f('#1a2415')}"/>
+      <path d="M82 75 Q92 66 90 80 Q85 92 78 87 Z" fill="${f('#1a2415')}"/>
+      <ellipse cx="60" cy="98" rx="18" ry="5" fill="rgba(0,0,0,0.25)"/>`,
+
+    dark_bat:`
+      <path d="M8 50 Q30 18 60 50 Q90 18 112 50 Q90 56 60 62 Q30 56 8 50 Z" fill="${f('#1a1025')}"/>
+      <ellipse cx="60" cy="62" rx="13" ry="15" fill="${f('#160e20')}"/>
+      <circle cx="53" cy="57" r="3" fill="${f('#6a1a8a')}"/>
+      <circle cx="67" cy="57" r="3" fill="${f('#6a1a8a')}"/>
+      <circle cx="53" cy="56" r="1.5" fill="#cc44ff"/>
+      <circle cx="67" cy="56" r="1.5" fill="#cc44ff"/>
+      <path d="M56 65 Q60 70 64 65" stroke="#6a1a8a" stroke-width="1.5" fill="none"/>
+      <path d="M60 72 L46 83 M60 72 L74 83" stroke="${f('#1a1025')}" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="60" cy="84" rx="10" ry="4" fill="rgba(0,0,0,0.22)"/>`,
+
+    corrupted_boar:`
+      <ellipse cx="60" cy="73" rx="38" ry="26" fill="${f('#1e1815')}"/>
+      <ellipse cx="60" cy="55" rx="26" ry="22" fill="${f('#191410')}"/>
+      <ellipse cx="44" cy="52" rx="10" ry="13" fill="${f('#150f0c')}"/>
+      <ellipse cx="76" cy="52" rx="10" ry="13" fill="${f('#150f0c')}"/>
+      <circle cx="52" cy="58" r="4" fill="#2a1a1a"/>
+      <circle cx="68" cy="58" r="4" fill="#2a1a1a"/>
+      <circle cx="52" cy="57" r="2.5" fill="${hit?'#ff3030':'#8a1a1a'}"/>
+      <circle cx="68" cy="57" r="2.5" fill="${hit?'#ff3030':'#8a1a1a'}"/>
+      <ellipse cx="60" cy="67" rx="12" ry="10" fill="${f('#150f0c')}"/>
+      <circle cx="56" cy="69" r="3" fill="#0a0808"/>
+      <circle cx="64" cy="69" r="3" fill="#0a0808"/>
+      <path d="M47 71 L41 60 L43 58 Z" fill="${hit?'#ffb030':'#c5a059'}"/>
+      <path d="M73 71 L79 60 L77 58 Z" fill="${hit?'#ffb030':'#c5a059'}"/>
+      <ellipse cx="60" cy="97" rx="30" ry="7" fill="rgba(0,0,0,0.25)"/>`,
+
+    goblin_brute:`
+      <rect x="35" y="76" width="50" height="28" rx="4" fill="${f('#2a2018')}"/>
+      <rect x="30" y="60" width="60" height="28" rx="3" fill="${f('#231a12')}"/>
+      <ellipse cx="60" cy="48" rx="22" ry="20" fill="${f('#1e1610')}"/>
+      <ellipse cx="42" cy="38" rx="8" ry="11" fill="${f('#181008')}"/>
+      <ellipse cx="78" cy="38" rx="8" ry="11" fill="${f('#181008')}"/>
+      <circle cx="52" cy="48" r="4" fill="#2a1a0a"/>
+      <circle cx="68" cy="48" r="4" fill="#2a1a0a"/>
+      <circle cx="52" cy="47" r="2" fill="${hit?'#ff4430':'#8a3a1a'}"/>
+      <circle cx="68" cy="47" r="2" fill="${hit?'#ff4430':'#8a3a1a'}"/>
+      <rect x="36" y="58" width="48" height="7" rx="2" fill="${hit?'#ffc060':'#c5a059'}" opacity="0.75"/>
+      <rect x="20" y="60" width="14" height="35" rx="3" fill="${f('#1e1610')}"/>
+      <rect x="86" y="60" width="14" height="35" rx="3" fill="${f('#1e1610')}"/>
+      <ellipse cx="60" cy="103" rx="30" ry="6" fill="rgba(0,0,0,0.25)"/>`,
+
+    rift_wolf:`
+      <ellipse cx="60" cy="79" rx="38" ry="28" fill="${f('#0d0d14')}"/>
+      <ellipse cx="60" cy="52" rx="28" ry="27" fill="${f('#090910')}"/>
+      <ellipse cx="42" cy="36" rx="12" ry="17" fill="${f('#07070f')}"/>
+      <ellipse cx="78" cy="36" rx="12" ry="17" fill="${f('#07070f')}"/>
+      <circle cx="50" cy="52" r="6" fill="#101018"/>
+      <circle cx="70" cy="52" r="6" fill="#101018"/>
+      <circle cx="50" cy="51" r="4" fill="${hit?'#cc44ff':'#5a1aff'}" opacity="0.95"/>
+      <circle cx="70" cy="51" r="4" fill="${hit?'#cc44ff':'#5a1aff'}" opacity="0.95"/>
+      <circle cx="50" cy="51" r="2" fill="#9060ff"/>
+      <circle cx="70" cy="51" r="2" fill="#9060ff"/>
+      <path d="M48 65 Q60 74 72 65" stroke="#1a1a30" stroke-width="2" fill="none"/>
+      <path d="M48 66 L44 72 M54 69 L52 74 M60 71 L60 76 M66 69 L68 74 M72 66 L76 72" stroke="#24243a" stroke-width="1.5"/>
+      <path d="M59 56 L55 45 L59 48 L60 40 L61 48 L65 45 L61 56" fill="#2a1a3a" opacity="0.7"/>
+      <path d="M20 82 Q10 72 14 86 Q18 97 28 93 Z" fill="${f('#0a0a10')}"/>
+      <path d="M100 82 Q110 72 106 86 Q102 97 92 93 Z" fill="${f('#0a0a10')}"/>
+      <path d="M35 97 L28 110 M46 101 L40 114 M60 103 L60 116 M74 101 L80 114 M85 97 L92 110" stroke="${f('#0d0d14')}" stroke-width="5" stroke-linecap="round"/>
+      <ellipse cx="50" cy="50" rx="7" ry="2" fill="${hit?'#aa44ff':'#4a0aff'}" opacity="0.3" transform="rotate(-15,50,50)"/>
+      <ellipse cx="70" cy="50" rx="7" ry="2" fill="${hit?'#aa44ff':'#4a0aff'}" opacity="0.3" transform="rotate(15,70,50)"/>
+      <ellipse cx="60" cy="110" rx="35" ry="8" fill="${hit?'rgba(170,68,255,0.18)':'rgba(74,10,255,0.12)'}"/>`,
+  };
+  return s[id] || s.rift_rat;
+}
+</script>
+</body>
+</html>
