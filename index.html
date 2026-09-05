@@ -803,26 +803,17 @@ function calcPosture(lm){
   const rAngle  = elbowAngle(lm[12],lm[14],lm[16]);
   const avgAngle = (lAngle && rAngle) ? (lAngle+rAngle)/2 : (lAngle||rAngle||null);
 
-  // ── 1. BODY ALIGNMENT ─────────────────────────
-  // We relax this significantly so the user doesn't have to fit their whole body in frame.
-  const sY = (lm[11].y + lm[12].y) / 2;
-  const hY = (lm[23].y + lm[24].y) / 2;
-  let aY = hY; 
-  if(lm[27] && lm[28] && lm[27].visibility > 0.4 && lm[28].visibility > 0.4){
-    aY = (lm[27].y + lm[28].y) / 2;
-  }
-  
-  // Just check if shoulders and hips are somewhat aligned, but don't strictly enforce it.
-  const bodySpread = Math.abs(sY - hY);
-  const isHorizontal = bodySpread < 0.45; // very relaxed
+  // ── 1. SHOULDERS (Replacing full body alignment) ────────
+  // We completely ignore legs/hips so you can play anywhere.
+  // Just check if shoulders are roughly level.
+  const sY1 = lm[11] ? lm[11].y : 0;
+  const sY2 = lm[12] ? lm[12].y : 0;
+  const shoulderTilt = Math.abs(sY1 - sY2);
   
   let alignment = {status:'idle', text:'ALIGNMENT'};
-  if(isHorizontal){
-    const idealHipY = (sY + aY) / 2;
-    const hipDev = hY - idealHipY;
-    if(Math.abs(hipDev) < 0.1)         alignment = {status:'good', text:'ALIGNED ✓'};
-    else if(hipDev < -0.1)             alignment = {status:'warn', text:'LOWER HIPS'};
-    else                               alignment = {status:'warn', text:'TIGHTEN CORE'};
+  if (lm[11] && lm[12] && lm[11].visibility > 0.4 && lm[12].visibility > 0.4) {
+    if(shoulderTilt < 0.1)      alignment = {status:'good', text:'SHOULDERS LEVEL ✓'};
+    else                        alignment = {status:'warn', text:'LEVEL SHOULDERS'};
   }
 
   // ── 2. DEPTH ──────────────────────────────────
@@ -938,26 +929,6 @@ function drawSkeletonPosture(ctx, lm, w, h, posture){
   // ── Draw elbow angle arcs ─────────────────────
   drawElbowAngle(ctx, lm[11], lm[13], lm[15], px, py, posture.lAngle);
   drawElbowAngle(ctx, lm[12], lm[14], lm[16], px, py, posture.rAngle);
-
-  // ── Draw ideal body line guide ────────────────
-  if(posture.isHorizontal){
-    const sX = (px(lm[11])+px(lm[12]))/2, sY = (py(lm[11])+py(lm[12]))/2;
-    const hX = (px(lm[23])+px(lm[24]))/2, hY = (py(lm[23])+py(lm[24]))/2;
-    const aX = lm[27]&&lm[28] ? (px(lm[27])+px(lm[28]))/2 : hX+20;
-    const aY = lm[27]&&lm[28] ? (py(lm[27])+py(lm[28]))/2 : hY;
-    // Draw ideal line (shoulder to ankle)
-    const ideaColor = posture.alignment.status === 'good'
-      ? 'rgba(80,220,120,0.25)'
-      : 'rgba(255,165,0,0.2)';
-    ctx.setLineDash([6,4]);
-    ctx.beginPath();
-    ctx.moveTo(sX,sY);
-    ctx.lineTo(aX,aY);
-    ctx.strokeStyle = ideaColor;
-    ctx.lineWidth=1.5;
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
 
   // ── Push-up phase text on canvas ─────────────
   const phaseText = CAM.phase === 'DOWN' ? 'PUSH UP!' : CAM.phase === 'READY' ? 'GO LOWER' : '';
