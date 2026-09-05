@@ -164,13 +164,14 @@ body{
 }
 
 /* Camera canvas — fills the arena as background */
+/* NOTE: mirror is done via ctx.scale(-1,1) when drawing, NOT via CSS transform */
 #battle-canvas{
   position:absolute;inset:0;
   width:100%;height:100%;
   object-fit:cover;
-  transform:scaleX(-1); /* mirror selfie */
   z-index:1;
   display:block;
+  background:#000;
 }
 
 /* Dark fallback background when no camera */
@@ -629,6 +630,9 @@ const CAM = {
   enabled:false, training:false, ready:false,
   stream:null, pose:null, mpCamera:null,
   pendingKey:null,
+  // Latest MediaPipe results (used by video loop to draw skeleton)
+  latestLandmarks:null,
+  latestPosture:null,
   // Push-up state machine
   phase:'IDLE',       // IDLE | READY | DOWN
   readyFrames:0,
@@ -684,13 +688,51 @@ async function requestCamera(){
     CAM.enabled = true;
     CAM.training = false;
     CAM.ready = true;
-    initMediaPipe();
     doStartBattle(CAM.pendingKey);
+    // Start raw video loop immediately so camera shows right away
+    startVideoLoop();
+    // Init MediaPipe in background (skeleton will appear once loaded)
+    initMediaPipe();
   } catch(err){
     console.warn('Camera error:', err);
     alert('Camera access denied. Switching to Training Mode.');
     useTrainingMode();
   }
+}
+
+// Continuously draws raw video to canvas — runs independently of MediaPipe
+// This ensures camera feed is always visible even while MediaPipe loads
+function startVideoLoop(){
+  const video  = document.getElementById('pose-video');
+  const canvas = document.getElementById('battle-canvas');
+  function loop(){
+    if(!CAM.enabled || !CAM.stream) return; // stop if camera turned off
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if(w > 0 && h > 0 && canvas){
+      if(canvas.width !== w)  canvas.width  = w;
+      if(canvas.height !== h) canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      // Draw video mirrored (selfie-mirror effect)
+      ctx.save();
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.restore();
+      // Draw vignette
+      const vig = ctx.createRadialGradient(w/2,h/2,h*0.2,w/2,h/2,h*0.8);
+      vig.addColorStop(0,'rgba(0,0,0,0)');
+      vig.addColorStop(1,'rgba(0,0,0,0.55)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0,0,w,h);
+      // Draw latest skeleton results on top (if available from MediaPipe)
+      if(CAM.latestLandmarks && CAM.latestPosture){
+        drawSkeletonPosture(ctx, CAM.latestLandmarks, w, h, CAM.latestPosture);
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 }
 
 function useTrainingMode(){
@@ -729,34 +771,15 @@ function initMediaPipe(){
 }
 
 // ═══════════════════════════════════════════════
-//  POSE RESULTS → DRAW + DETECT
+//  POSE RESULTS — store landmarks, update UI
+//  Drawing is handled by the startVideoLoop rAF
 // ═══════════════════════════════════════════════
 function onPoseResults(results){
-  const canvas = document.getElementById('battle-canvas');
-  if(!canvas || document.getElementById('screen-battle').style.opacity === '0') return;
-  if(!document.getElementById('screen-battle').classList.contains('active')) return;
-
-  const video = document.getElementById('pose-video');
-  const w = video.videoWidth || 640;
-  const h = video.videoHeight || 480;
-  canvas.width = w;
-  canvas.height = h;
-
-  const ctx = canvas.getContext('2d');
-
-  // Draw mirrored video (canvas CSS already mirrors via scaleX(-1))
-  // so we draw normally here
-  ctx.clearRect(0,0,w,h);
-  ctx.drawImage(video,0,0,w,h);
-
-  // Dark cinematic vignette
-  const vig = ctx.createRadialGradient(w/2,h/2,h*0.2,w/2,h/2,h*0.8);
-  vig.addColorStop(0,'rgba(0,0,0,0)');
-  vig.addColorStop(1,'rgba(0,0,0,0.6)');
-  ctx.fillStyle = vig;
-  ctx.fillRect(0,0,w,h);
+  if(!CAM.enabled) return;
 
   if(!results.poseLandmarks){
+    CAM.latestLandmarks = null;
+    CAM.latestPosture   = null;
     setBadge('DETECTING','nopose');
     setPosture('idle','idle','idle','ALIGNMENT','DEPTH','SYMMETRY');
     CAM.phase='IDLE'; CAM.readyFrames=0;
@@ -765,7 +788,9 @@ function onPoseResults(results){
 
   const lm = results.poseLandmarks;
   const posture = calcPosture(lm);
-  drawSkeletonPosture(ctx, lm, w, h, posture);
+  // Store for the video loop to draw on next frame
+  CAM.latestLandmarks = lm;
+  CAM.latestPosture   = posture;
   updatePostureUI(posture);
   detectPushUp(lm, posture);
 }
@@ -846,7 +871,8 @@ const ARM_CONNS  = [[11,13],[13,15],[12,14],[14,16],[15,17],[16,18]];
 const BODY_CONNS = [[11,12],[23,24],[11,23],[12,24],[23,25],[25,27],[24,26],[26,28]];
 
 function drawSkeletonPosture(ctx, lm, w, h, posture){
-  // Since CSS mirrors the canvas (scaleX(-1)), we mirror X in coords too
+  // Video is drawn mirrored (ctx.scale(-1,1)), so we also mirror landmark X coords
+  // to align skeleton with the flipped video
   const px = (l) => (1 - l.x) * w;
   const py = (l) => l.y * h;
   const vis = (l) => l && l.visibility > 0.4;
